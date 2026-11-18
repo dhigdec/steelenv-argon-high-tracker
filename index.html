@@ -70,8 +70,8 @@ function score(r) {   // a try's score from the verifier, 0 to 1; 1.0 = every ch
   const ok = +r >= 0.9999;
   return '<span class="chip ' + (ok ? 'ok' : 'bad') + '">' + (ok ? '1.0 ✓' : (+r).toFixed(2)) + '</span>';
 }
-function tryCell(t) {
-  if (!t) return '<span class="chip q">queued</span>';
+function tryCell(t, rerun) {
+  if (!t) return '<span class="chip q">' + (rerun ? 're-run queued' : 'queued') + '</span>';
   if (t.state === 'starting') return '<span class="chip q">starting</span><div class="meta">' + dur(t.started) + '</div>';
   if (t.state === 'running') return '<span class="chip run">▶ running</span><div class="meta">' + (t.turns || 0) + ' turns · ' + dur(t.started) + '</div>';
   if (t.state === 'grading') return '<span class="chip grade">grading</span><div class="meta">' + (t.turns || 0) + ' turns · ' + dur(t.started) + '</div>';
@@ -101,7 +101,7 @@ function render(d) {
     d.tasks.map(t => {
       const live = t.tries.filter(x => !x.excluded), ex = t.tries.filter(x => x.excluded);
       const refs = models.map(m => '<td class="ref">' + (t.ref && t.ref[m] ? t.ref[m].map(score).join('') : esc(t.compare[m])) + '</td>').join('');
-      const slots = [0, 1, 2].map(i => '<td class="try">' + tryCell(live[i]) +
+      const slots = [0, 1, 2].map(i => '<td class="try">' + tryCell(live[i], ex.length > 0) +
         (i === 2 ? live.slice(3).map(x => '<div class="meta">extra try:</div>' + tryCell(x)).join('') : '') + '</td>').join('');
       const exNote = ex.length ? '<div class="meta" title="' + esc(ex.map(x => x.excluded).join(' | ')) + '">' + ex.length +
         ' provider error' + (ex.length > 1 ? 's' : '') + ', re-run</div>' : '';
