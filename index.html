@@ -31,6 +31,8 @@ tr:last-child td{border-bottom:none}
 .vm{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:12px}
 footer{color:var(--muted);font-size:12px;margin-top:22px}
 .note{background:var(--warnbg);color:var(--warn);border-radius:8px;padding:8px 12px;margin:0 0 12px}
+.meta{font-size:11px;color:var(--muted);margin-top:2px;white-space:nowrap}
+td.try{min-width:108px}
 </style></head><body><main>
 <h1>Gemini 4 Argon (high) · pass@3 on 50 hard SteelEnv code tasks</h1>
 <p class="sub">The 50 Frontier v2 headline tasks that both GPT-6 Astra (high) and Claude Opus 5.5 (high) failed at least 2 of 3 times. Same task versions, harness and limits as their published runs.</p>
@@ -42,7 +44,7 @@ footer{color:var(--muted);font-size:12px;margin-top:22px}
 <div class="vms" id="vms"></div>
 <h2>Tasks</h2>
 <div class="wrap"><table id="tasks"></table></div>
-<footer>A try counts unless it ended on a model-provider failure with no output file; such tries are replaced (struck through, reason on hover). Graded zeros and timeouts count. Argon (high) pass@3 covers tasks with all 3 counted tries. The page reads live data every 2 minutes.</footer>
+<footer>A try is one full, independent attempt at a task; a turn is one step inside it (the model thinks, runs one tool, reads the result). A try's score is the verifier's reward from 0 to 1; 1.0 ✓ means every check passed, which is what counts as solved. A try counts unless it ended on a model-provider failure with no output file; such tries are re-run (count and reason on hover in the last column). Graded zeros and timeouts count. Argon (high) pass@3 covers tasks with all 3 counted tries. The page reads live data every 2 minutes.</footer>
 </main><script>
 const API = 'https://api.github.com/repos/dhigdec/steelenv-argon-high-tracker/contents/status.json?ref=data';
 const RAW = 'https://raw.githubusercontent.com/dhigdec/steelenv-argon-high-tracker/data/status.json';
@@ -58,14 +60,24 @@ function mins(a, b) {
   const e = (b ? Date.parse(b) : Date.now()) - Date.parse(a);
   return Math.max(0, Math.round(e / 60000)) + 'm';
 }
-function chip(t) {
-  if (t.excluded) return '<span class="chip ex" title="' + esc(t.excluded) + '">provider error</span>';
-  if (t.state === 'running') return '<span class="chip run">▶ ' + (t.turns || 0) + ' turns · ' + mins(t.started) + '</span>';
-  if (t.state === 'starting') return '<span class="chip q">starting · ' + mins(t.started) + '</span>';
-  if (t.state === 'grading') return '<span class="chip grade">grading</span>';
-  if (t.reward == null) return '<span class="chip warn" title="ended without a reward; re-graded at the end">no reward yet</span>';
-  const r = +t.reward, tip = (t.turns || 0) + ' turns · ' + mins(t.started, t.finished);
-  return '<span class="chip ' + (r >= 0.9999 ? 'ok' : 'bad') + '" title="' + tip + '">' + (r >= 0.9999 ? '1.0' : r.toFixed(2)) + '</span>';
+function dur(a, b) {
+  if (!a) return '';
+  const m = Math.max(0, Math.round(((b ? Date.parse(b) : Date.now()) - Date.parse(a)) / 60000));
+  return m < 60 ? m + 'm' : Math.floor(m / 60) + 'h ' + (m % 60) + 'm';
+}
+function score(r) {   // a try's score from the verifier, 0 to 1; 1.0 = every check passed = solved
+  if (r == null) return '<span class="chip q">–</span>';
+  const ok = +r >= 0.9999;
+  return '<span class="chip ' + (ok ? 'ok' : 'bad') + '">' + (ok ? '1.0 ✓' : (+r).toFixed(2)) + '</span>';
+}
+function tryCell(t) {
+  if (!t) return '<span class="chip q">queued</span>';
+  if (t.state === 'starting') return '<span class="chip q">starting</span><div class="meta">' + dur(t.started) + '</div>';
+  if (t.state === 'running') return '<span class="chip run">▶ running</span><div class="meta">' + (t.turns || 0) + ' turns · ' + dur(t.started) + '</div>';
+  if (t.state === 'grading') return '<span class="chip grade">grading</span><div class="meta">' + (t.turns || 0) + ' turns · ' + dur(t.started) + '</div>';
+  const meta = '<div class="meta">' + (t.turns || 0) + ' turns · ' + dur(t.started, t.finished) + '</div>';
+  if (t.reward == null) return '<span class="chip warn" title="ended without a score; re-graded at the end">no score yet</span>' + meta;
+  return score(t.reward) + meta;
 }
 function render(d) {
   const T = d.totals, note = document.getElementById('note');
@@ -83,10 +95,19 @@ function render(d) {
   document.getElementById('vms').innerHTML = d.vms.map(v => '<div class="vm"><b>' + esc(v.vm.replace('cadgui-argonh-', '')) + '</b> · ' + esc(v.state) +
     ' · ' + v.running + ' running · ' + v.finished + ' done · ' + v.tasks + ' tasks</div>').join('');
   const models = Object.keys(d.tasks[0].compare);
-  document.getElementById('tasks').innerHTML = '<tr><th>Task</th><th>Family</th><th>Tier</th>' + models.map(m => '<th>' + esc(m).replace(' (', '<br>(') + '</th>').join('') +
-    '<th>Argon (high) tries</th><th>Argon (high)</th></tr>' + d.tasks.map(t => '<tr><td>' + esc(t.task) + '</td><td>' + esc(t.family) + '</td><td>' + esc(t.tier) + '</td>' +
-    models.map(m => '<td>' + esc(t.compare[m]) + '</td>').join('') + '<td>' + (t.tries.length ? t.tries.map(chip).join('') : '<span class="chip q">queued</span>') +
-    '</td><td class="mine">' + esc(t.mine) + '</td></tr>').join('');
+  document.getElementById('tasks').innerHTML = '<tr><th>Task</th><th>Family</th><th>Tier</th>' +
+    models.map(m => '<th>' + esc(m).replace(' (', '<br>(') + '<br><span class="muted">3 try scores</span></th>').join('') +
+    '<th>Argon (high)<br>try 1</th><th>Argon (high)<br>try 2</th><th>Argon (high)<br>try 3</th><th>Argon (high)<br>solved</th></tr>' +
+    d.tasks.map(t => {
+      const live = t.tries.filter(x => !x.excluded), ex = t.tries.filter(x => x.excluded);
+      const refs = models.map(m => '<td>' + (t.ref && t.ref[m] ? t.ref[m].map(score).join('') : esc(t.compare[m])) + '</td>').join('');
+      const slots = [0, 1, 2].map(i => '<td class="try">' + tryCell(live[i]) +
+        (i === 2 ? live.slice(3).map(x => '<div class="meta">extra try:</div>' + tryCell(x)).join('') : '') + '</td>').join('');
+      const exNote = ex.length ? '<div class="meta" title="' + esc(ex.map(x => x.excluded).join(' | ')) + '">' + ex.length +
+        ' provider error' + (ex.length > 1 ? 's' : '') + ', re-run</div>' : '';
+      return '<tr><td>' + esc(t.task) + '</td><td>' + esc(t.family) + '</td><td>' + esc(t.tier) + '</td>' + refs + slots +
+        '<td class="mine">' + esc(t.mine) + exNote + '</td></tr>';
+    }).join('');
 }
 async function load() {
   let d = null;
