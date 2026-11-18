@@ -32,7 +32,7 @@ tr:last-child td{border-bottom:none}
 footer{color:var(--muted);font-size:12px;margin-top:22px}
 .note{background:var(--warnbg);color:var(--warn);border-radius:8px;padding:8px 12px;margin:0 0 12px}
 .meta{font-size:11px;color:var(--muted);margin-top:2px;white-space:nowrap}
-td.try{min-width:108px}
+td.try{min-width:108px}td.ref{white-space:nowrap}
 </style></head><body><main>
 <h1>Gemini 4 Argon (high) · pass@3 on 50 hard SteelEnv code tasks</h1>
 <p class="sub">The 50 Frontier v2 headline tasks that both GPT-6 Astra (high) and Claude Opus 5.5 (high) failed at least 2 of 3 times. Same task versions, harness and limits as their published runs.</p>
@@ -100,7 +100,7 @@ function render(d) {
     '<th>Argon (high)<br>try 1</th><th>Argon (high)<br>try 2</th><th>Argon (high)<br>try 3</th><th>Argon (high)<br>solved</th></tr>' +
     d.tasks.map(t => {
       const live = t.tries.filter(x => !x.excluded), ex = t.tries.filter(x => x.excluded);
-      const refs = models.map(m => '<td>' + (t.ref && t.ref[m] ? t.ref[m].map(score).join('') : esc(t.compare[m])) + '</td>').join('');
+      const refs = models.map(m => '<td class="ref">' + (t.ref && t.ref[m] ? t.ref[m].map(score).join('') : esc(t.compare[m])) + '</td>').join('');
       const slots = [0, 1, 2].map(i => '<td class="try">' + tryCell(live[i]) +
         (i === 2 ? live.slice(3).map(x => '<div class="meta">extra try:</div>' + tryCell(x)).join('') : '') + '</td>').join('');
       const exNote = ex.length ? '<div class="meta" title="' + esc(ex.map(x => x.excluded).join(' | ')) + '">' + ex.length +
